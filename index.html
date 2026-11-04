@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b5ed7">
+  <title>Site Report Generator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app-header">
+      <h1>SITE REPORT GENERATOR</h1>
+    </header>
+
+    <!-- FORM VIEW -->
+    <div id="formView">
+      <section class="card" id="siteCard">
+        <label for="siteName" class="field-label">SITE NAME <span class="req">*</span></label>
+        <input id="siteName" type="text" class="text-input" placeholder="Enter Site Name"
+               autocomplete="off" autocapitalize="words" maxlength="100">
+      </section>
+
+      <div id="photoList"></div>
+
+      <section class="card generate-card">
+        <p class="counter">REQUIRED PHOTOS: <strong id="counter">0/6</strong></p>
+        <div id="message" class="message" hidden role="alert"></div>
+        <div id="progress" class="progress" hidden></div>
+        <button id="generateBtn" type="button" class="btn btn-generate is-disabled">GENERATE REPORT</button>
+      </section>
+    </div>
+
+    <!-- SUCCESS VIEW -->
+    <div id="successView" hidden>
+      <section class="card success-card">
+        <p class="success-title">✓ REPORT GENERATED SUCCESSFULLY</p>
+
+        <p class="small-label">Site Name</p>
+        <p class="big-value" id="successSite"></p>
+
+        <hr>
+        <p class="small-label">PDF Report</p>
+        <p class="file-name" id="pdfName"></p>
+        <a id="pdfLink" class="btn btn-primary" href="#">DOWNLOAD PDF</a>
+
+        <hr>
+        <p class="small-label">Original Photographs</p>
+        <p class="file-name" id="zipName"></p>
+        <a id="zipLink" class="btn btn-primary" href="#">DOWNLOAD ORIGINAL PHOTOS ZIP</a>
+
+        <hr>
+        <button id="newBtn" type="button" class="btn btn-secondary">CREATE NEW REPORT</button>
+      </section>
+    </div>
+  </main>
+
+  <!-- Libraries (client-side only; nothing is uploaded anywhere) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
