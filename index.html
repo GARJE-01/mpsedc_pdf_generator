@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="theme-color" content="#1e293b">
+  <meta name="description" content="Field Engineer Utility: Site Installation Photo & Report Generator">
+  <title>Site Report Generator</title>
+  
+  <link rel="stylesheet" href="style.css">
+
+  <!-- jsPDF & JSZip: Vendor bundle with CDN fallback -->
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script>
+    if (!window.jspdf) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>');
+    }
+  </script>
+  <script src="lib/jszip.min.js"></script>
+  <script>
+    if (!window.JSZip) {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand-title-wrap">
+          <span class="brand-icon">📋</span>
+          <div>
+            <h1 class="brand-title">SITE REPORT GENERATOR</h1>
+            <p class="brand-subtitle">Field Engineer Installation Documentation</p>
+          </div>
+        </div>
+        <div class="badge-client-only">
+          <span class="dot-indicator"></span> 100% Client-Side &bull; Secure
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Form Screen -->
+    <main id="formScreen" class="main-content">
+      
+      <!-- Site Name Card -->
+      <section class="card site-name-card" id="siteNameSection">
+        <div class="card-header">
+          <label for="siteNameInput" class="section-label">
+            SITE NAME <span class="required-star">*</span>
+          </label>
+          <span class="help-text">Mandatory site/branch name (used for PDF &amp; ZIP filenames)</span>
+        </div>
+        <div class="input-wrapper">
+          <span class="input-icon">📍</span>
+          <input 
+            type="text" 
+            id="siteNameInput" 
+            class="site-input" 
+            placeholder="Enter Site Name (e.g., Mumbai Fort, Pune Camp)" 
+            autocomplete="off"
+            autocapitalize="words"
+            spellcheck="false"
+            required
+          >
+          <button type="button" id="clearSiteNameBtn" class="clear-btn" title="Clear input" style="display: none;">&times;</button>
+        </div>
+        <div class="input-hint" id="siteNamePreviewText">Filename: <em>Enter site name above</em></div>
+      </section>
+
+      <!-- Progress Indicator Banner -->
+      <section class="progress-banner" id="progressBanner">
+        <div class="progress-info">
+          <span class="progress-title">REQUIRED PHOTOS</span>
+          <span class="progress-count" id="progressCount">0 / 6 Completed</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+        </div>
+      </section>
+
+      <!-- Photo Categories Section -->
+      <section class="categories-list" id="categoriesContainer">
+        <!-- Photo cards are injected by script.js to ensure consistency -->
+      </section>
+
+      <!-- Bottom Sticky Action Bar -->
+      <div class="sticky-action-bar">
+        <div class="bar-inner">
+          <div class="bar-summary">
+            <span class="bar-status-label">STATUS</span>
+            <span class="bar-status-value" id="barStatusValue">0 of 6 Photos Ready</span>
+          </div>
+          <button type="button" id="generateReportBtn" class="btn-generate">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">GENERATE REPORT</span>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Success Screen (Initially Hidden) -->
+    <section id="successScreen" class="main-content success-screen" style="display: none;">
+      <div class="success-card">
+        
+        <div class="success-icon-wrap">
+          <div class="success-checkmark">✓</div>
+        </div>
+
+        <h2 class="success-title">REPORT GENERATED SUCCESSFULLY</h2>
+        <p class="success-subtitle">Both the PDF report and original photos ZIP have been prepared locally in your browser.</p>
+
+        <div class="site-summary-box">
+          <span class="summary-label">Site Name:</span>
+          <span class="summary-value" id="successSiteName">Mumbai Fort</span>
+        </div>
+
+        <div class="download-grid">
+          
+          <!-- PDF Download Card -->
+          <div class="download-item-card pdf-card">
+            <div class="download-card-header">
+              <span class="file-type-icon">📄</span>
+              <div class="download-card-meta">
+                <span class="file-type-title">PDF Report</span>
+                <span class="file-name" id="pdfFileNameDisplay">Mumbai_Fort.pdf</span>
+                <span class="file-meta-sub" id="pdfMetaDisplay">6 Pages &bull; High Resolution</span>
+              </div>
+            </div>
+            <button type="button" id="downloadPdfBtn" class="btn-download btn-download-pdf">
+              <span class="btn-icon">⬇</span>
+              <span>DOWNLOAD PDF</span>
+            </button>
+          </div>
+
+          <!-- ZIP Download Card -->
+          <div class="download-item-card zip-card">
+            <div class="download-card-header">
+              <span class="file-type-icon">🗂️</span>
+              <div class="download-card-meta">
+                <span class="file-type-title">Original Photographs</span>
+                <span class="file-name" id="zipFileNameDisplay">Mumbai_Fort.zip</span>
+                <span class="file-meta-sub" id="zipMetaDisplay">6 Raw Photos (Original Quality)</span>
+              </div>
+            </div>
+            <button type="button" id="downloadZipBtn" class="btn-download btn-download-zip">
+              <span class="btn-icon">⬇</span>
+              <span>DOWNLOAD ORIGINAL PHOTOS ZIP</span>
+            </button>
+          </div>
+
+        </div>
+
+        <div class="reset-wrap">
+          <button type="button" id="createNewReportBtn" class="btn-reset">
+            <span class="btn-icon">🔄</span>
+            <span>CREATE NEW REPORT</span>
+          </button>
+          <p class="reset-note">Make sure you have downloaded both files before starting a new report.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Photo Source Chooser Modal (Bottom Sheet on Mobile) -->
+    <div id="sourceModal" class="modal-backdrop" style="display: none;">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h3 class="modal-title" id="sourceModalTitle">Add Photo</h3>
+          <p class="modal-subtitle">Choose how you want to add this photograph:</p>
+        </div>
+        <div class="modal-body source-options-grid">
+          <button type="button" id="modalCameraBtn" class="source-option-btn camera-btn">
+            <span class="source-icon">📷</span>
+            <div class="source-text">
+              <strong>Take Photo</strong>
+              <small>Use Phone Camera directly</small>
+            </div>
+          </button>
+          <button type="button" id="modalGalleryBtn" class="source-option-btn gallery-btn">
+            <span class="source-icon">🖼️</span>
+            <div class="source-text">
+              <strong>Choose from Gallery</strong>
+              <small>Select from Files or Album</small>
+            </div>
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="modalCancelBtn" class="btn-modal-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Native File Inputs -->
+    <!-- Input 1: Camera capture (rear camera) -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+    <!-- Input 2: Gallery / Files selector without capture -->
+    <input type="file" id="galleryInput" accept="image/*" style="display: none;">
+
+    <!-- Generating Progress Overlay Modal -->
+    <div id="progressModal" class="modal-backdrop" style="display: none;">
+      <div class="modal-card progress-card">
+        <div class="spinner-wrap">
+          <div class="spinner"></div>
+        </div>
+        <h3 class="progress-modal-title" id="progressModalTitle">Generating Report...</h3>
+        <p class="progress-modal-desc" id="progressModalDesc">Please wait while the PDF and ZIP files are being prepared.</p>
+        <div class="progress-modal-steps" id="progressStepsList">
+          <div class="step-item" id="step-photos">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Verifying 6 photographs...</span>
+          </div>
+          <div class="step-item" id="step-pdf">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Creating 6-page PDF document...</span>
+          </div>
+          <div class="step-item" id="step-zip">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">Packing original photographs into ZIP...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incomplete Report Dialog Modal -->
+    <div id="incompleteModal" class="modal-backdrop" style="display: none;">
+      <div class="modal-card incomplete-card">
+        <div class="alert-icon-wrap">
+          <span class="alert-icon">⚠️</span>
+        </div>
+        <h3 class="alert-title">REPORT INCOMPLETE</h3>
+        <p class="alert-message">Please complete the following mandatory item(s) before generating:</p>
+        <ul class="missing-items-list" id="missingItemsList">
+          <!-- Filled dynamically -->
+        </ul>
+        <button type="button" id="closeIncompleteBtn" class="btn-alert-ok">OK, I will complete it</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
