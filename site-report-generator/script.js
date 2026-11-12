@@ -465,9 +465,14 @@
     const cat = state.categories.find(c => c.id === categoryId);
     if (!cat) return;
 
-    // Check basic file validity
-    if (!file || !file.type.startsWith('image/')) {
-      alert(`Invalid file selected for "${cat.title}". Please select an image photograph.`);
+    // Check basic file validity (supporting both mime-types and file extensions for all Android file managers)
+    const isImageFile = file && (
+      (file.type && file.type.startsWith('image/')) ||
+      (file.name && /\.(jpe?g|png|webp|bmp|gif|heic|heif)$/i.test(file.name))
+    );
+
+    if (!isImageFile || !file || file.size === 0) {
+      alert(`Invalid or empty file selected for "${cat.title}". Please select or capture a valid photo.`);
       return;
     }
 
