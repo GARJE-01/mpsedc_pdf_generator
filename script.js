@@ -20,6 +20,11 @@
       title: 'Pre-Installation Photo',
       purpose: 'Photograph of the site before installation begins.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -31,6 +36,11 @@
       title: 'Post-Installation Photo',
       purpose: 'Photograph of the site after installation is completed.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -42,6 +52,11 @@
       title: 'CMD Photo',
       purpose: 'Photograph of the CMD output/evidence required for this project.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -53,6 +68,11 @@
       title: 'Speed Test Photo',
       purpose: 'Photograph showing the speed test result.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -64,6 +84,11 @@
       title: 'Working Application Photo',
       purpose: 'Photograph showing that the application/system is working successfully.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -75,6 +100,11 @@
       title: 'Sign-Off Report Photo',
       purpose: 'Photograph of the completed sign-off report.',
       file: null,
+      arrayBuffer: null,
+      rawBlob: null,
+      originalName: '',
+      originalType: '',
+      originalSize: 0,
       previewUrl: null,
       width: 0,
       height: 0,
@@ -196,7 +226,7 @@
         const previewWrap = document.createElement('div');
         previewWrap.className = 'photo-preview-wrap';
 
-        const sizeFormatted = formatFileSize(cat.file.size);
+        const sizeFormatted = formatFileSize(cat.originalSize || (cat.file && cat.file.size) || 0);
         const dimensionsFormatted = cat.width && cat.height ? `${cat.width} × ${cat.height} px` : '';
 
         previewWrap.innerHTML = `
@@ -392,10 +422,11 @@
     dom.sourceModal.style.display = 'none';
   }
 
-  function handleNativeFileInput(e) {
+  async function handleNativeFileInput(e) {
     const file = e.target.files && e.target.files[0];
-    if (file && state.activeCategoryId) {
-      processSelectedPhoto(state.activeCategoryId, file);
+    const catId = state.activeCategoryId;
+    if (file && catId) {
+      await processSelectedPhoto(catId, file);
     }
     // Clear value so the same file can be re-selected if retried
     e.target.value = '';
@@ -419,7 +450,7 @@
     }
   }
 
-  function handleDrop(e) {
+  async function handleDrop(e) {
     const dropzone = e.target.closest('.upload-dropzone');
     if (dropzone) {
       e.preventDefault();
@@ -427,7 +458,7 @@
       dropzone.style.backgroundColor = '';
       const catId = dropzone.getAttribute('data-id');
       if (catId && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        processSelectedPhoto(catId, e.dataTransfer.files[0]);
+        await processSelectedPhoto(catId, e.dataTransfer.files[0]);
       }
     }
   }
@@ -441,6 +472,11 @@
     }
 
     cat.file = null;
+    cat.arrayBuffer = null;
+    cat.rawBlob = null;
+    cat.originalName = '';
+    cat.originalType = '';
+    cat.originalSize = 0;
     cat.previewUrl = null;
     cat.width = 0;
     cat.height = 0;
@@ -456,9 +492,11 @@
 
   /**
    * Multi-layered browser-compatible image decoding pipeline:
-   * 1. Try createImageBitmap with imageOrientation: 'from-image' (hardware EXIF orientation).
-   * 2. Fallback to standard Image() with URL.createObjectURL + HTMLImageElement.decode().
-   * 3. Fallback to FileReader readAsDataURL.
+   * 1. Immediately reads raw binary into memory (ArrayBuffer) to guard against
+   *    Android OS temporary ContentProvider permission revocation.
+   * 2. Try createImageBitmap with imageOrientation: 'from-image' (hardware EXIF orientation).
+   * 3. Fallback to standard Image() with URL.createObjectURL + HTMLImageElement.decode().
+   * 4. Fallback to FileReader readAsDataURL.
    * Verifies valid dimensions (> 0) and non-corrupted data before marking ready.
    */
   async function processSelectedPhoto(categoryId, file) {
@@ -483,21 +521,34 @@
       if (dropzone) {
         dropzone.innerHTML = `
           <div class="spinner" style="width: 28px; height: 28px; border-width: 3px;"></div>
-          <span style="font-size: 13px; font-weight: 600; color: var(--primary);">Decoding photograph...</span>
+          <span style="font-size: 13px; font-weight: 600; color: var(--primary);">Reading &amp; validating photo...</span>
         `;
       }
     }
 
     try {
-      const decodedData = await decodeImageWithFallbacks(file);
+      // CRITICAL FOR ANDROID: Immediately read raw bytes into memory while active OS permission is fresh!
+      // This prevents "permission problems that have occurred after a reference to a file was acquired"
+      const arrayBuffer = await readFileAsArrayBuffer(file);
+      const mimeType = file.type || 'image/jpeg';
+      const stableBlob = new Blob([arrayBuffer], { type: mimeType });
+
+      // Decode dimensions and create preview URL from the in-memory stable blob
+      const decodedData = await decodeImageWithFallbacks(stableBlob);
 
       // Revoke any previous preview URL for this slot to avoid memory leak
       if (cat.previewUrl) {
         URL.revokeObjectURL(cat.previewUrl);
       }
 
-      // Store the EXACT original File object (Section 14: for ZIP generation)
+      // Store in state: in-memory ArrayBuffer, stableBlob, and metadata
+      // This completely decouples data from Android OS file permissions
+      cat.arrayBuffer = arrayBuffer;
+      cat.rawBlob = stableBlob;
       cat.file = file;
+      cat.originalName = file.name || `${cat.title}.jpg`;
+      cat.originalType = mimeType;
+      cat.originalSize = file.size || arrayBuffer.byteLength;
       cat.previewUrl = decodedData.previewUrl;
       cat.width = decodedData.width;
       cat.height = decodedData.height;
@@ -514,7 +565,7 @@
     } catch (err) {
       console.error(`Decoding failed for category ${cat.title}:`, err);
       renderCategoryCards();
-      alert(`Unable to process "${cat.title}". The image file could not be decoded. Please retake or upload the photograph again.`);
+      alert(`Unable to process "${cat.title}": ${err.message || 'File could not be read'}. Please retake or upload the photograph again.`);
     }
   }
 
@@ -626,12 +677,28 @@
     });
   }
 
+  function readFileAsArrayBuffer(fileOrBlob) {
+    if (typeof fileOrBlob.arrayBuffer === 'function') {
+      return fileOrBlob.arrayBuffer().catch(() => readFileWithFileReaderAsArrayBuffer(fileOrBlob));
+    }
+    return readFileWithFileReaderAsArrayBuffer(fileOrBlob);
+  }
+
+  function readFileWithFileReaderAsArrayBuffer(fileOrBlob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('FileReader failed to read file buffer'));
+      reader.readAsArrayBuffer(fileOrBlob);
+    });
+  }
+
   // ==========================================================================
   // 9. PROGRESS & VALIDATION UI
   // ==========================================================================
 
   function updateProgressUI() {
-    const readyCount = state.categories.filter(c => c.isReady && c.file).length;
+    const readyCount = state.categories.filter(c => c.isReady && (c.arrayBuffer || c.rawBlob || c.file)).length;
     const totalCount = state.categories.length;
     const percentage = Math.round((readyCount / totalCount) * 100);
 
@@ -665,7 +732,7 @@
 
     // Check all 6 categories
     state.categories.forEach(cat => {
-      if (!cat.isReady || !cat.file) {
+      if (!cat.isReady || (!cat.arrayBuffer && !cat.rawBlob && !cat.file)) {
         missing.push({ type: 'photo', id: cat.id, label: cat.title });
       }
     });
@@ -917,16 +984,17 @@
    * - Converts to standard sRGB baseline JPEG data URL
    */
   async function prepareImageForPdf(cat) {
-    const file = cat.file;
+    // Use in-memory stable blob to avoid Android OS permission expiration
+    const blobToUse = cat.rawBlob || cat.file;
 
     // Attempt Path 1: createImageBitmap with hardware EXIF orientation handling
     if (typeof window.createImageBitmap === 'function') {
       try {
         let bitmap = null;
         try {
-          bitmap = await window.createImageBitmap(file, { imageOrientation: 'from-image' });
+          bitmap = await window.createImageBitmap(blobToUse, { imageOrientation: 'from-image' });
         } catch (optErr) {
-          bitmap = await window.createImageBitmap(file);
+          bitmap = await window.createImageBitmap(blobToUse);
         }
 
         if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
@@ -1021,7 +1089,7 @@
 
       img.onerror = () => {
         // Attempt Path 3: FileReader with Data URL
-        readFileAsDataURL(file)
+        readFileAsDataURL(blobToUse)
           .then(dataUrl => {
             const fallbackImg = new Image();
             fallbackImg.onload = () => {
@@ -1035,7 +1103,7 @@
           .catch(err => reject(new Error(`Failed to read ${cat.title}: ${err.message}`)));
       };
 
-      img.src = cat.previewUrl || URL.createObjectURL(file);
+      img.src = cat.previewUrl || URL.createObjectURL(blobToUse);
     });
   }
 
@@ -1046,10 +1114,11 @@
   /**
    * Generates a ZIP archive containing the 6 original uploaded photographs.
    * Section 14 Strict Rules:
-   * - Uses actual original File objects uploaded by the FE.
+   * - Uses actual original File bytes uploaded by the FE.
    * - No canvas processing, no re-compression, no resolution changes, no screenshots.
    * - Preserves original file extension.
    * - Category-based filenames inside the ZIP.
+   * - Uses in-memory ArrayBuffer / Blob to prevent Android OS permission revocation.
    */
   async function generateZipArchive() {
     if (typeof window.JSZip !== 'function') {
@@ -1059,23 +1128,26 @@
     const zip = new JSZip();
 
     state.categories.forEach(cat => {
-      const originalFile = cat.file;
-
       // Extract original file extension
       let ext = 'jpg';
-      if (originalFile.name && originalFile.name.lastIndexOf('.') !== -1) {
-        ext = originalFile.name.substring(originalFile.name.lastIndexOf('.') + 1).toLowerCase();
-      } else if (originalFile.type) {
-        const mimeExt = originalFile.type.replace('image/', '').toLowerCase();
-        if (mimeExt === 'jpeg') ext = 'jpg';
-        else if (mimeExt) ext = mimeExt;
+      const name = cat.originalName || (cat.file && cat.file.name) || '';
+      if (name && name.lastIndexOf('.') !== -1) {
+        ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase();
+      } else {
+        const mimeType = cat.originalType || (cat.file && cat.file.type) || '';
+        if (mimeType) {
+          ext = mimeType.replace('image/', '').toLowerCase();
+          if (ext === 'jpeg') ext = 'jpg';
+        }
       }
 
       // Meaningful category-based filename preserving original extension
       const zipEntryName = `${cat.title}.${ext}`;
 
-      // Store raw original File object directly
-      zip.file(zipEntryName, originalFile);
+      // CRITICAL FOR ANDROID: Pass in-memory ArrayBuffer or rawBlob.
+      // Passing in-memory data reads directly from JavaScript RAM with ZERO Android file permission dependence!
+      const dataToZip = cat.arrayBuffer || cat.rawBlob || cat.file;
+      zip.file(zipEntryName, dataToZip);
     });
 
     // Generate ZIP blob with standard DEFLATE compression
